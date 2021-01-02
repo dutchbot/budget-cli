@@ -11,47 +11,45 @@ INPUT_DATE_FORMAT = '%Y%m%d'
 def main():
     args = parse_arguments()
 
-    stores = args.stores
+    retailers = args.retailers
     file_path = args.input_file_path
 
     transactions = extract_records(file_path)
 
-    transactions_filtered = filter_transactions(stores, transactions)
+    transactions_filtered = filter_transactions(retailers, transactions)
     grouped_by_date = group_by_date(transactions_filtered)
     
     workbook = xlsxwriter.Workbook('budget_analysis.xlsx')
     currency_format = workbook.add_format(EURO_FORMAT)
 
-    worksheet1 = get_worksheet(workbook, "ExpenditureByDate")
+    worksheet1 = get_worksheet(workbook, "Retailer Expenditure by date")
     transform_to_workbook_by_date(grouped_by_date, worksheet1,currency_format)
 
-    worksheet2 = get_worksheet(workbook, "AccumulusByStore")
-    accumulus_store = calculate_accumulated_cost_by_store(transactions_filtered)
-    print(accumulus_store)
-    transform_to_workbook(worksheet2, accumulus_store,currency_format)
+    worksheet2 = get_worksheet(workbook, "Retailer Accumulative")
+    accumulative_by_retailer = calculate_retailer_accumulative(transactions_filtered)
+    transform_to_workbook(worksheet2, accumulative_by_retailer,currency_format)
 
-    worksheet3 = get_worksheet(workbook, "StoreCostPerMonth")
-    storecost_month =calculated_store_cost_per_month(transactions_filtered)
-    print(storecost_month)
-    transform_to_workbook(worksheet3, storecost_month,currency_format)
+    worksheet3 = get_worksheet(workbook, "Retailer cost by month")
+    monthly_cost_by_retailer = calculate_retailer_cost_per_month(transactions_filtered)
+    transform_to_workbook(worksheet3, monthly_cost_by_retailer,currency_format)
 
     workbook.close()
 
 
-def calculate_accumulated_cost_by_store(transactions):
-    store_accumulated_cost = {}
+def calculate_retailer_accumulative(transactions):
+    accumulative_cost = {}
 
     for transaction in transactions:
-        store = transaction[1]
+        retailer = transaction[1]
         value = convert_to_decimal(transaction[6])
-        if(store in store_accumulated_cost):
-            store_accumulated_cost[store] += value
+        if(retailer in accumulative_cost):
+            accumulative_cost[retailer] += value
         else:
-            store_accumulated_cost[store] = value
+            accumulative_cost[retailer] = value
         
-    return store_accumulated_cost
+    return accumulative_cost
 
-def calculated_store_cost_per_month(transactions):
+def calculate_retailer_cost_per_month(transactions):
     accumulated_month_view = {}
 
     for transaction in transactions:
@@ -66,19 +64,19 @@ def calculated_store_cost_per_month(transactions):
     return accumulated_month_view
 
 def group_by_date(transactions):
-    store_transaction_by_date = {}
+    expenditure_by_date_by_retailer = {}
 
     for transaction in transactions:
         date = transaction[0]
         value = convert_to_decimal(transaction[6])
-        store = transaction[1]
+        retailer = transaction[1]
 
-        if date in store_transaction_by_date:
-            store_transaction_by_date[date][store] = value
+        if date in expenditure_by_date_by_retailer:
+            expenditure_by_date_by_retailer[date][retailer] = value
         else:
-            store_transaction_by_date[date] = { store: value}
+            expenditure_by_date_by_retailer[date] = { retailer: value}
 
-    return store_transaction_by_date
+    return expenditure_by_date_by_retailer
 
 def convert_to_decimal(str_value):
     culture_version = str_value.replace(',','.')
@@ -86,15 +84,15 @@ def convert_to_decimal(str_value):
 
     return decimal_version
 
-def filter_transactions(stores, transactions):
+def filter_transactions(retailers, transactions):
     filtered_transactions=[]
     
     for transaction in transactions:
         name = transaction[1]
-        for store in stores:
-            if name.lower().find(store.lower()) > -1:
+        for retailer in retailers:
+            if name.lower().find(retailer.lower()) > -1:
                 # easier lookup, make option?
-                transaction[1] = store
+                transaction[1] = retailer
                 filtered_transactions.append(transaction)
 
     return filtered_transactions
@@ -120,8 +118,8 @@ def transform_to_workbook_by_date(grouped_by_date_transactions, worksheet, curre
         strformat = time.strftime("%d-%m-%Y")
         worksheet.write('A' + str(rowIndex), strformat) 
         rowSpan = rowIndex
-        for store, value in accumulated_transactions.items():
-            worksheet.write('B' + str(rowSpan), store)
+        for retailer, value in accumulated_transactions.items():
+            worksheet.write('B' + str(rowSpan), retailer)
             worksheet.write('C' + str(rowSpan), value, currency_format)
             rowSpan += 1
         rowIndex += len(accumulated_transactions)
@@ -138,7 +136,7 @@ def parse_arguments():
         description='Based on input csv containing transactions, generate structured excel to allow detailed analysis and budgeting.')
 
     parser.add_argument("input_file_path", metavar='str', help='Absolute path to input file, csv extension')
-    parser.add_argument('--stores', nargs='*', help="list of stores to filter transactions on")
+    parser.add_argument('--retailers', nargs='*', help="list of retailers to filter transactions on")
 
     args = parser.parse_args()
 

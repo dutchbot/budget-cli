@@ -3,5 +3,5 @@
 
 
 ```
-.\analyse.py transactions.csv --stores 'Lidl' 'Aldi'
+.\analyse.py transactions.csv --retailers 'Lidl' 'Aldi'
 ```
