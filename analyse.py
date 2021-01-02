@@ -4,8 +4,10 @@ import calendar
 import xlsxwriter
 import argparse
 from decimal import Decimal
+import copy
 
 EURO_FORMAT = {'num_format': '€#,##0.00'}
+DATE_FORMAT = {'num_format': 'dd-mm-yyyy'}
 INPUT_DATE_FORMAT = '%Y%m%d'
 
 def main():
@@ -20,18 +22,14 @@ def main():
     grouped_by_date = group_by_date(transactions_filtered)
     
     workbook = xlsxwriter.Workbook('budget_analysis.xlsx')
-    currency_format = workbook.add_format(EURO_FORMAT)
 
-    worksheet1 = get_worksheet(workbook, "Retailer Expenditure by date")
-    transform_to_workbook_by_date(grouped_by_date, worksheet1,currency_format)
+    transform_to_workbook_by_date(grouped_by_date, workbook, "Retailer Expenditure by date")
 
-    worksheet2 = get_worksheet(workbook, "Retailer Accumulative")
     accumulative_by_retailer = calculate_retailer_accumulative(transactions_filtered)
-    transform_to_workbook(worksheet2, accumulative_by_retailer,currency_format)
+    transform_to_workbook( accumulative_by_retailer, workbook, "Retailer Accumulative")
 
-    worksheet3 = get_worksheet(workbook, "Retailer cost by month")
     monthly_cost_by_retailer = calculate_retailer_cost_per_month(transactions_filtered)
-    transform_to_workbook(worksheet3, monthly_cost_by_retailer,currency_format)
+    transform_to_workbook( monthly_cost_by_retailer, workbook,  "Retailer cost by month")
 
     workbook.close()
 
@@ -101,34 +99,45 @@ def extract_records(file_path):
     records = []
 
     with open(file_path, newline='') as csvfile:
-        spamreader = csv.reader(csvfile, delimiter=';')
-        for row_columns in spamreader:
+        linereader = csv.reader(csvfile, delimiter=';')
+        for row_columns in linereader:
             records.append(row_columns)
 
     return records
 
-def get_worksheet(workbook, name):
-    return workbook.add_worksheet(name)
 
-def transform_to_workbook_by_date(grouped_by_date_transactions, worksheet, currency_format):
-    rowIndex = 1
-    for record, accumulated_transactions in grouped_by_date_transactions.items():
-        date = record
-        time = datetime.strptime(date, INPUT_DATE_FORMAT)
-        strformat = time.strftime("%d-%m-%Y")
-        worksheet.write('A' + str(rowIndex), strformat) 
+def transform_to_workbook_by_date(grouped_by_date_transactions, workbook, sheetname):
+
+    worksheet = workbook.add_worksheet(sheetname)
+    date_format = workbook.add_format(DATE_FORMAT)
+    currency_format= workbook.add_format(EURO_FORMAT)
+
+    rowIndex = 0
+    for date, accumulated_transactions in grouped_by_date_transactions.items():
+
+        date_time = datetime.strptime(date, INPUT_DATE_FORMAT)
+        worksheet.write_datetime(rowIndex, 0, date_time, date_format)
+
         rowSpan = rowIndex
         for retailer, value in accumulated_transactions.items():
-            worksheet.write('B' + str(rowSpan), retailer)
-            worksheet.write('C' + str(rowSpan), value, currency_format)
+
+            worksheet.write(rowSpan, 1, retailer)
+            worksheet.write_number(rowSpan, 2, value, currency_format)
+
             rowSpan += 1
         rowIndex += len(accumulated_transactions)
 
-def transform_to_workbook(worksheet, view, currency_format):
-    rowIndex = 1
+def transform_to_workbook(view, workbook, sheetname):
+
+    worksheet = workbook.add_worksheet(sheetname)
+    currency_format= workbook.add_format(EURO_FORMAT)
+
+    rowIndex = 0
     for key, value in view.items():
-        worksheet.write('A' + str(rowIndex), key) 
-        worksheet.write('B' + str(rowIndex), value, currency_format)
+        worksheet.write(rowIndex, 0, key) 
+
+        worksheet.write_number(rowIndex, 1, value, currency_format)
+
         rowIndex += 1
 
 def parse_arguments():
