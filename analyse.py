@@ -1,12 +1,12 @@
 import csv
-import datetime
+from datetime import datetime
 import calendar
 import xlsxwriter
 import argparse
-from dateutil import parser
 from decimal import Decimal
 
-euro_format = {'num_format': '€#,##0.00'}
+EURO_FORMAT = {'num_format': '€#,##0.00'}
+INPUT_DATE_FORMAT = '%Y%m%d'
 
 def main():
     args = parse_arguments()
@@ -20,7 +20,7 @@ def main():
     grouped_by_date = group_by_date(transactions_filtered)
     
     workbook = xlsxwriter.Workbook('budget_analysis.xlsx')
-    currency_format = workbook.add_format(euro_format)
+    currency_format = workbook.add_format(EURO_FORMAT)
 
     worksheet1 = get_worksheet(workbook, "ExpenditureByDate")
     transform_to_workbook_by_date(grouped_by_date, worksheet1,currency_format)
@@ -55,7 +55,7 @@ def calculated_store_cost_per_month(transactions):
     accumulated_month_view = {}
 
     for transaction in transactions:
-        time = parser.parse(transaction[0])
+        time = datetime.strptime(transaction[0], INPUT_DATE_FORMAT)
         month_name = calendar.month_name[time.month]
         value = convert_to_decimal(transaction[6])
         if month_name in accumulated_month_view:
@@ -116,7 +116,7 @@ def transform_to_workbook_by_date(grouped_by_date_transactions, worksheet, curre
     rowIndex = 1
     for record, accumulated_transactions in grouped_by_date_transactions.items():
         date = record
-        time = parser.parse(date)
+        time = datetime.strptime(date, INPUT_DATE_FORMAT)
         strformat = time.strftime("%d-%m-%Y")
         worksheet.write('A' + str(rowIndex), strformat) 
         rowSpan = rowIndex
