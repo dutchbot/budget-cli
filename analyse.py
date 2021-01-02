@@ -17,6 +17,8 @@ def main():
     file_path = args.input_file_path
 
     transactions = extract_records(file_path)
+    # reverse, so we start at january
+    transactions.reverse()
 
     transactions_filtered = filter_transactions(retailers, transactions)
     grouped_by_date = group_by_date(transactions_filtered)
@@ -29,7 +31,8 @@ def main():
     transform_to_workbook( accumulative_by_retailer, workbook, "Retailer Accumulative")
 
     monthly_cost_by_retailer = calculate_retailer_cost_per_month(transactions_filtered)
-    transform_to_workbook( monthly_cost_by_retailer, workbook,  "Retailer cost by month")
+    month_sheet = transform_to_workbook( monthly_cost_by_retailer, workbook,  "Retailer cost by month")
+    add_chart(workbook, month_sheet, 1, len(monthly_cost_by_retailer.keys()), "Retailer cost by month")
 
     workbook.close()
 
@@ -139,6 +142,17 @@ def transform_to_workbook(view, workbook, sheetname):
         worksheet.write_number(rowIndex, 1, value, currency_format)
 
         rowIndex += 1
+    
+    return worksheet
+
+def add_chart(workbook, worksheet, start, end, sheet_name):
+    chart = workbook.add_chart({'type': 'line'})
+    sheet_name_quoted = f'\'{sheet_name}\''
+
+    chart.add_series({'values': f'={sheet_name_quoted}!$B${start}:$B${end}'})
+
+    worksheet.insert_chart('C1', chart)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
