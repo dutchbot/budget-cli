@@ -1,0 +1,4 @@
+*.xlsx
+*.csv
+self.md
+.vscode
