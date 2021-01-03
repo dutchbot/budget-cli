@@ -21,11 +21,11 @@ def main():
     transactions.reverse()
 
     transactions_filtered = filter_transactions(retailers, transactions)
-    grouped_by_date = group_by_date(transactions_filtered)
+    structured_data = convert_to_structure(transactions_filtered)
     
     workbook = xlsxwriter.Workbook('budget_analysis.xlsx')
 
-    transform_to_workbook_by_date(grouped_by_date, workbook, "Retailer Expenditure by date")
+    transform_to_workbook_by_date(structured_data, workbook, "Retailer Expenditure by date")
 
     accumulative_by_retailer = calculate_retailer_accumulative(transactions_filtered)
     transform_to_workbook( accumulative_by_retailer, workbook, "Retailer Accumulative")
@@ -64,20 +64,32 @@ def calculate_retailer_cost_per_month(transactions):
 
     return accumulated_month_view
 
-def group_by_date(transactions):
-    expenditure_by_date_by_retailer = {}
+def convert_to_structure(transactions):
+    structured_data = { 0: {}, 1: [] }
+    date_counts = {}
 
+    offset=0
     for transaction in transactions:
         date = transaction[0]
         value = convert_to_decimal(transaction[6])
         retailer = transaction[1]
 
-        if date in expenditure_by_date_by_retailer:
-            expenditure_by_date_by_retailer[date][retailer] = value
+        if date in date_counts:
+            date_counts[date] += 1
         else:
-            expenditure_by_date_by_retailer[date] = { retailer: value}
+            date_counts[date] = offset
+        
+        structured_data[1].insert(offset, { retailer: value })
 
-    return expenditure_by_date_by_retailer
+        offset+=1
+
+    rowOffset=0
+    for date_entry, date_count in date_counts.items():
+        entry = { "bounds": [rowOffset, date_count] }
+        structured_data[0][date_entry] = entry
+        rowOffset = date_count
+
+    return structured_data
 
 def convert_to_decimal(str_value):
     culture_version = str_value.replace(',','.')
@@ -108,32 +120,49 @@ def extract_records(file_path):
 
     return records
 
-
-def transform_to_workbook_by_date(grouped_by_date_transactions, workbook, sheetname):
+def transform_to_workbook_by_date(structured_data, workbook, sheetname):
 
     worksheet = workbook.add_worksheet(sheetname)
     date_format = workbook.add_format(DATE_FORMAT)
-    currency_format= workbook.add_format(EURO_FORMAT)
+    currency_format = workbook.add_format(EURO_FORMAT)
+
+    max_characters_0 = get_column_width_by_max_chars(structured_data[0].keys())
+    #todo: fix below column widths
+    max_characters_1 = get_column_width_by_max_chars(structured_data[1])
+    max_characters_2 = get_column_width_by_max_chars(structured_data[1])
+
+    worksheet.set_column(0, 0, max_characters_0)
+    worksheet.set_column(1, 1, max_characters_1)
+    worksheet.set_column(2, 2, max_characters_2)
 
     rowIndex = 0
-    for date, accumulated_transactions in grouped_by_date_transactions.items():
+    for date in structured_data[0].keys():
+        lower_bound = structured_data[0][date]["bounds"][0]
+        upper_bound = structured_data[0][date]["bounds"][1]
 
         date_time = datetime.strptime(date, INPUT_DATE_FORMAT)
-        worksheet.write_datetime(rowIndex, 0, date_time, date_format)
+        worksheet.write_datetime(lower_bound, 0, date_time, date_format)
 
-        rowSpan = rowIndex
-        for retailer, value in accumulated_transactions.items():
-
-            worksheet.write(rowSpan, 1, retailer)
-            worksheet.write_number(rowSpan, 2, value, currency_format)
-
-            rowSpan += 1
-        rowIndex += len(accumulated_transactions)
+        rowSpan = upper_bound - lower_bound
+        if rowSpan > 0:
+            for spanIndex in range(lower_bound, upper_bound):
+                retailer = list(structured_data[1][spanIndex].keys())[0]
+                value = list(structured_data[1][spanIndex].values())[0]
+                worksheet.write(spanIndex, 1, retailer)
+                worksheet.write_number(spanIndex, 2, value, currency_format)
+        
+        rowIndex += 1
 
 def transform_to_workbook(view, workbook, sheetname):
 
     worksheet = workbook.add_worksheet(sheetname)
     currency_format= workbook.add_format(EURO_FORMAT)
+
+    max_characters_key = get_column_width_by_max_chars(view.keys())
+    max_characters_value = get_column_width_by_max_chars(view.values())
+
+    worksheet.set_column(0, 0, max_characters_key)
+    worksheet.set_column(1, 1, max_characters_value)
 
     rowIndex = 0
     for key, value in view.items():
@@ -144,6 +173,18 @@ def transform_to_workbook(view, workbook, sheetname):
         rowIndex += 1
     
     return worksheet
+
+def get_column_width_by_max_chars(collection):
+    def get_max(item):
+        if type(item) is type(str):
+            return len(item)
+        return len(str(item))
+
+    max_item = max(collection, key=get_max)
+    if type(max_item) is type(str):
+        return len(max_item) + 1
+    
+    return len(str(max_item)) + 1
 
 def add_chart(workbook, worksheet, start, end, sheet_name):
     chart = workbook.add_chart({'type': 'line'})
