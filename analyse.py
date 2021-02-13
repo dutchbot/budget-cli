@@ -14,9 +14,12 @@ def main():
     args = parse_arguments()
 
     retailers = args.retailers
+    if(len(retailers) == 0):
+        retailers = [retailer[0] for retailer in read_file(args.retailers_file)]
+        print(retailers)
     file_path = args.input_file_path
 
-    transactions = extract_records(file_path)
+    transactions = read_file(file_path)
     # reverse, so we start at january
     transactions.reverse()
 
@@ -110,7 +113,7 @@ def filter_transactions(retailers, transactions):
 
     return filtered_transactions
 
-def extract_records(file_path):
+def read_file(file_path):
     records = []
 
     with open(file_path, newline='') as csvfile:
@@ -200,11 +203,10 @@ def parse_arguments():
         description='Based on input csv containing transactions, generate structured excel to allow detailed analysis and budgeting.')
 
     parser.add_argument("input_file_path", metavar='str', help='Absolute path to input file, csv extension')
-    parser.add_argument('--retailers', nargs='*', help="list of retailers to filter transactions on")
+    parser.add_argument("--retailers-file", dest="retailers_file", metavar='str', help='Csv file with retailers to extract transactions for')
+    parser.add_argument('--retailers', nargs='*', help="list of retailers to filter transactions on", default=[])
 
     args = parser.parse_args()
-
-    print(args)
 
     return args
 
