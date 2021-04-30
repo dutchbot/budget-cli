@@ -17,21 +17,33 @@ def main():
     if(len(retailers) == 0):
         retailers = [retailer[0] for retailer in read_file(args.retailers_file)]
         print(retailers)
-    file_path = args.input_file_path
 
-    transactions = read_file(file_path)
-    # reverse, so we start at january
-    transactions.reverse()
+    files_to_process = []
 
-    transactions_filtered = filter_transactions(retailers, transactions)
-    structured_data = convert_to_structure(transactions_filtered)
+    if args.multi:
+        files = read_file(args.input_file_path)
+        for file in files:
+            files_to_process.append(file[0])
+    else:
+        files_to_process.append(args.input_file_path)
+        
+    transactions_filtered = []
+    structured_data = {}
+
+    for file_path in files_to_process:
+        transactions = read_file(file_path)
+        # reverse, so we start at january
+        transactions.reverse()
+
+        transactions_filtered = transactions_filtered + filter_transactions(retailers, transactions)
+        structured_data.update(convert_to_structure(transactions_filtered))
     
     workbook = xlsxwriter.Workbook('budget_analysis.xlsx')
 
     transform_to_workbook_by_date(structured_data, workbook, "Retailer Expenditure by date")
 
     accumulative_by_retailer = calculate_retailer_accumulative(transactions_filtered)
-    transform_to_workbook( accumulative_by_retailer, workbook, "Retailer Accumulative")
+    transform_to_workbook(accumulative_by_retailer, workbook, "Retailer Accumulative")
 
     monthly_cost_by_retailer = calculate_retailer_cost_per_month(transactions_filtered)
     month_sheet = transform_to_workbook( monthly_cost_by_retailer, workbook,  "Retailer cost by month")
@@ -58,12 +70,12 @@ def calculate_retailer_cost_per_month(transactions):
 
     for transaction in transactions:
         time = datetime.strptime(transaction[0], INPUT_DATE_FORMAT)
-        month_name = calendar.month_name[time.month]
+        month_year_name = calendar.month_name[time.month] + str(time.year)
         value = convert_to_decimal(transaction[6])
-        if month_name in accumulated_month_view:
-            accumulated_month_view[month_name] += value
+        if month_year_name in accumulated_month_view:
+            accumulated_month_view[month_year_name] += value
         else:
-            accumulated_month_view[month_name] = value
+            accumulated_month_view[month_year_name] = value
 
     return accumulated_month_view
 
@@ -203,6 +215,7 @@ def parse_arguments():
         description='Based on input csv containing transactions, generate structured excel to allow detailed analysis and budgeting.')
 
     parser.add_argument("input_file_path", metavar='str', help='Absolute path to input file, csv extension')
+    parser.add_argument("--multi", dest='multi', action="store_const", const=True, default=False, help='Changes the behaviour of reading the input file, interprets as list of files in csv form')
     parser.add_argument("--retailers-file", dest="retailers_file", metavar='str', help='Csv file with retailers to extract transactions for')
     parser.add_argument('--retailers', nargs='*', help="list of retailers to filter transactions on", default=[])
 
